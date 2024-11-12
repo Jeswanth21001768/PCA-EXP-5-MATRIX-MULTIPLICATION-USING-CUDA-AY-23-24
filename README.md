@@ -1,37 +1,72 @@
-# PCA-EXP-5-MATRIX-MULTIPLICATION-USING-CUDA-AY-23-24
+# PCA-EXP-6-MATRIX-TRANSPOSITION-USING-SHARED-MEMORY-AY-23-24
 
 <h3>NAME: Jeswanth.S</h3>
-<h3>REGISTER NO: 212221230042</h3>
-<h3>EX.NO: 5</h3>
-<h3>DATE: 23.04.2024</h3>
-<h1> <align=center> MATRIX MULTIPLICATION USING CUDA </h3>
-  Implement Matrix Multiplication using GPU.</h3>
+<h3>REGISTER NO:212221230042</h3>
+<h3>EX. NO:6</h3>
+<h3>DATE:08.05.24</h3>
+<h1> <align=center> MATRIX TRANSPOSITION USING SHARED MEMORY </h3>
+  Implement Matrix transposition using GPU Shared memory.</h3>
 
 ## AIM:
-To perform Matrix Multiplication using CUDA and check its performance with nvprof.
+
+To perform Matrix Multiplication using Transposition using shared memory.
+
 ## EQUIPMENTS REQUIRED:
+
 Hardware – PCs with NVIDIA GPU & CUDA NVCC
 Google Colab with NVCC Compiler
-## PROCEDURE:
-1.	Define Constants: Define the size of the matrices (SIZE) and the size of the CUDA blocks (BLOCK_SIZE).
-2.	Kernel Function: Define a CUDA kernel function matrixMultiply that performs the matrix multiplication.
-3.	In the main function, perform the following steps:
-4.	Initialize Matrices: Initialize the input matrices ‘a’ and ‘b’ with some values.
-5.	Allocate Device Memory: Allocate memory on the GPU for the input matrices ‘a’ and ‘b’, and the output matrix ‘c’.
-6.	Copy Matrices to Device: Copy the input matrices from host (CPU) memory to device (GPU) memory.
-7.	Set Grid and Block Sizes: Set the grid and block sizes for the CUDA kernel launch.
-8.	Start Timer: Start a timer to measure the execution time of the kernel.
-9.	Launch Kernel: Launch the matrixMultiply kernel with the appropriate grid and block sizes, and the input and output matrices as arguments.
-10.	Copy Result to Host: After the kernel execution, copy the result matrix from device memory to host memory.
-11.	Stop Timer: Stop the timer and calculate the elapsed time.
-12.	Print Result: Print the result matrix and the elapsed time.
-13.	Free Device Memory: Finally, free the device memory that was allocated for the matrices.
-## PROGRAM:
-```
-!pip install git+https://github.com/andreinechaev/nvcc4jupyter.git
-%load_ext nvcc4jupyter
 
-%%writefile matmul.cu
+## PROCEDURE:
+
+CUDA_SharedMemory_AccessPatterns:
+
+1. Begin Device Setup
+   1.1 Select the device to be used for computation
+   1.2 Retrieve the properties of the selected device
+2. End Device Setup
+
+3. Begin Array Size Setup
+   3.1 Set the size of the array to be used in the computation
+   3.2 The array size is determined by the block dimensions (BDIMX and BDIMY)
+4. End Array Size Setup
+
+5. Begin Execution Configuration
+   5.1 Set up the execution configuration with a grid and block dimensions
+   5.2 In this case, a single block grid is used
+6. End Execution Configuration
+
+7. Begin Memory Allocation
+   7.1 Allocate device memory for the output array d_C
+   7.2 Allocate a corresponding array gpuRef in the host memory
+8. End Memory Allocation
+
+9. Begin Kernel Execution
+   9.1 Launch several kernel functions with different shared memory access patterns (Use any two patterns)
+   9.1.1 setRowReadRow: Each thread writes to and reads from its row in shared memory
+   9.1.2 setColReadCol: Each thread writes to and reads from its column in shared memory
+   9.1.3 setColReadCol2: Similar to setColReadCol, but with transposed coordinates
+   9.1.4 setRowReadCol: Each thread writes to its row and reads from its column in shared memory
+   9.1.5 setRowReadColDyn: Similar to setRowReadCol, but with dynamic shared memory allocation
+   9.1.6 setRowReadColPad: Similar to setRowReadCol, but with padding to avoid bank conflicts
+   9.1.7 setRowReadColDynPad: Similar to setRowReadColPad, but with dynamic shared memory allocation
+10. End Kernel Execution
+
+11. Begin Memory Copy
+    11.1 After each kernel execution, copy the output array from device memory to host memory
+12. End Memory Copy
+
+13. Begin Memory Free
+    13.1 Free the device memory and host memory
+14. End Memory Free
+
+15. Reset the device
+
+16. End of Algorithm
+
+## PROGRAM:
+
+```Cuda
+%%cuda
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -110,105 +145,266 @@ inline double seconds()
 }
 
 #endif // _COMMON_H
-#define SIZE 4
-#define BLOCK_SIZE 2
 
-// Kernel function to perform matrix multiplication
-__global__ void matrixMultiply(int *a, int *b, int *c, int size)
+#define BDIMX 16
+#define BDIMY 16
+#define IPAD  2
+void printData(char *msg, int *in,  const int size)
 {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    printf("%s: ", msg);
 
-    int sum = 0;
-    for (int k = 0; k < size; ++k)
+    for (int i = 0; i < size; i++)
     {
-        sum += a[row * size + k] * b[k * size + col];
-    }
-    c[row * size + col] = sum;
-}
-int main()
-{
-    int a[SIZE][SIZE], b[SIZE][SIZE], c[SIZE][SIZE];
-    int *dev_a, *dev_b, *dev_c;
-    int size = SIZE * SIZE * sizeof(int);
-
-    // Initialize matrices 'a' and 'b'
-    for (int i = 0; i < SIZE; ++i)
-    {
-        for (int j = 0; j < SIZE; ++j)
-        {
-            a[i][j] = i + j;
-            b[i][j] = i - j;
-        }
+        printf("%4d", in[i]);
+        fflush(stdout);
     }
 
-    // Allocate memory on the device
-    cudaMalloc((void**)&dev_a, size);
-    cudaMalloc((void**)&dev_b, size);
-    cudaMalloc((void**)&dev_c, size);
-
-    // Copy input matrices from host to device memory
-    cudaMemcpy(dev_a, a, size, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_b, b, size, cudaMemcpyHostToDevice);
-
-    // Set grid and block sizes
-    dim3 dimGrid(SIZE / BLOCK_SIZE, SIZE / BLOCK_SIZE);
-    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-
-    // Start timer
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-
-    // Launch kernel
-    matrixMultiply<<<dimGrid, dimBlock>>>(dev_a, dev_b, dev_c, SIZE);
-
-    // Copy result matrix from device to host memory
-    cudaMemcpy(c, dev_c, size, cudaMemcpyDeviceToHost);
-
-    // Stop timer
-    gettimeofday(&end, NULL);
-    double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
-
-// Print the result matrix
-    printf("Result Matrix:\n");
-    for (int i = 0; i < SIZE; ++i)
-    {
-        for (int j = 0; j < SIZE; ++j)
-        {
-            printf("%d ", c[i][j]);
-        }
-        printf("\n");
-    }
-
-    // Print the elapsed time
-    printf("Elapsed Time: %.6f seconds\n", elapsed_time);
-
-    // Free device memory
-    cudaFree(dev_a);
-    cudaFree(dev_b);
-    cudaFree(dev_c);
-
-    return 0;
+    printf("\n\n");
 }
 
+__global__ void setRowReadRow(int *out)
+{
+    // static shared memory
+    __shared__ int tile[BDIMY][BDIMX];
 
-!nvcc -o matmul matmul.cu
+    // mapping from thread index to global memory index
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
 
-!./matmul
+    // shared memory store operation
+    tile[threadIdx.y][threadIdx.x] = idx;
 
-!nvprof ./matmul
+    // wait for all threads to complete
+    __syncthreads();
 
-!nvprof --print-gpu-trace ./matmul
+    // shared memory load operation
+    out[idx] = tile[threadIdx.y][threadIdx.x] ;
+}
+
+__global__ void setColReadCol(int *out)
+{
+    // static shared memory
+    __shared__ int tile[BDIMX][BDIMY];
+
+    // mapping from thread index to global memory index
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // shared memory store operation
+    tile[threadIdx.x][threadIdx.y] = idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[idx] = tile[threadIdx.x][threadIdx.y];
+}
+
+__global__ void setColReadCol2(int *out)
+{
+    // static shared memory
+    __shared__ int tile[BDIMY][BDIMX];
+
+    // mapping from 2D thread index to linear memory
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // convert idx to transposed coordinate (row, col)
+    unsigned int irow = idx / blockDim.y;
+    unsigned int icol = idx % blockDim.y;
+
+    // shared memory store operation
+    tile[icol][irow] = idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[idx] = tile[icol][irow] ;
+}
+
+__global__ void setRowReadCol(int *out)
+{
+    // static shared memory
+    __shared__ int tile[BDIMY][BDIMX];
+// mapping from 2D thread index to linear memory
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // convert idx to transposed coordinate (row, col)
+    unsigned int irow = idx / blockDim.y;
+    unsigned int icol = idx % blockDim.y;
+
+    // shared memory store operation
+    tile[threadIdx.y][threadIdx.x] = idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[idx] = tile[icol][irow];
+}
+
+__global__ void setRowReadColPad(int *out)
+{
+    // static shared memory
+    __shared__ int tile[BDIMY][BDIMX + IPAD];
+
+    // mapping from 2D thread index to linear memory
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // convert idx to transposed (row, col)
+    unsigned int irow = idx / blockDim.y;
+    unsigned int icol = idx % blockDim.y;
+
+    // shared memory store operation
+    tile[threadIdx.y][threadIdx.x] = idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[idx] = tile[icol][irow] ;
+}
+
+__global__ void setRowReadColDyn(int *out)
+{
+    // dynamic shared memory
+    extern  __shared__ int tile[];
+    // mapping from thread index to global memory index
+    unsigned int idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // convert idx to transposed (row, col)
+    unsigned int irow = idx / blockDim.y;
+    unsigned int icol = idx % blockDim.y;
+
+    // convert back to smem idx to access the transposed element
+    unsigned int col_idx = icol * blockDim.x + irow;
+
+    // shared memory store operation
+    tile[idx] = idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[idx] = tile[col_idx];
+}
+
+__global__ void setRowReadColDynPad(int *out)
+{
+    // dynamic shared memory
+    extern  __shared__ int tile[];
+
+    // mapping from thread index to global memory index
+    unsigned int g_idx = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // convert idx to transposed (row, col)
+    unsigned int irow = g_idx / blockDim.y;
+    unsigned int icol = g_idx % blockDim.y;
+
+    unsigned int row_idx = threadIdx.y * (blockDim.x + IPAD) + threadIdx.x;
+
+    // convert back to smem idx to access the transposed element
+    unsigned int col_idx = icol * (blockDim.x + IPAD) + irow;
+
+    // shared memory store operation
+    tile[row_idx] = g_idx;
+
+    // wait for all threads to complete
+    __syncthreads();
+
+    // shared memory load operation
+    out[g_idx] = tile[col_idx];
+}
+
+int main(int argc, char **argv)
+{
+    // set up device
+    int dev = 0;
+    cudaDeviceProp deviceProp;
+    CHECK(cudaGetDeviceProperties(&deviceProp, dev));
+    printf("%s at ", argv[0]);
+    printf("device %d: %s ", dev, deviceProp.name);
+    CHECK(cudaSetDevice(dev));
+
+    cudaSharedMemConfig pConfig;
+    CHECK(cudaDeviceGetSharedMemConfig ( &pConfig ));
+    printf("with Bank Mode:%s ", pConfig == 1 ? "4-Byte" : "8-Byte");
+
+    // set up array size
+    int nx = BDIMX;
+    int ny = BDIMY;
+
+    bool iprintf = 1;
+
+    if (argc > 1) iprintf = atoi(argv[1]);
+
+    size_t nBytes = nx * ny * sizeof(int);
+
+    // execution configuration
+    dim3 block (BDIMX, BDIMY);
+    dim3 grid  (1, 1);
+    printf("<<< grid (%d,%d) block (%d,%d)>>>\n", grid.x, grid.y, block.x,
+            block.y);
+
+    // allocate device memory
+    int *d_C;
+    CHECK(cudaMalloc((int**)&d_C, nBytes));
+    int *gpuRef  = (int *)malloc(nBytes);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setRowReadRow<<<grid, block>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setRowReadRow       ", gpuRef, nx * ny);
+CHECK(cudaMemset(d_C, 0, nBytes));
+    setColReadCol<<<grid, block>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setColReadCol       ", gpuRef, nx * ny);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setColReadCol2<<<grid, block>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setColReadCol2      ", gpuRef, nx * ny);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setRowReadCol<<<grid, block>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setRowReadCol       ", gpuRef, nx * ny);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setRowReadColDyn<<<grid, block, BDIMX*BDIMY*sizeof(int)>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setRowReadColDyn    ", gpuRef, nx * ny);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setRowReadColPad<<<grid, block>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setRowReadColPad    ", gpuRef, nx * ny);
+
+    CHECK(cudaMemset(d_C, 0, nBytes));
+    setRowReadColDynPad<<<grid, block, (BDIMX + IPAD)*BDIMY*sizeof(int)>>>(d_C);
+    CHECK(cudaMemcpy(gpuRef, d_C, nBytes, cudaMemcpyDeviceToHost));
+
+    if(iprintf)  printData("setRowReadColDynPad ", gpuRef, nx * ny);
+
+    // free host and device memory
+    CHECK(cudaFree(d_C));
+    free(gpuRef);
+
+    // reset device
+    CHECK(cudaDeviceReset());
+    return EXIT_SUCCESS;
+}
 ```
 
 ## OUTPUT:
 
-![407ex5](https://github.com/Dharshini-DS/PCA-EXP-5-MATRIX-MULTIPLICATION-USING-CUDA-AY-23-24/assets/93427345/ede8952a-c540-4551-9370-8c1b03d8d6df)
 
-
-![407ex5i](https://github.com/Dharshini-DS/PCA-EXP-5-MATRIX-MULTIPLICATION-USING-CUDA-AY-23-24/assets/93427345/a91467fe-db16-4655-94ae-df4843cd8183)
-
+![op1](https://github.com/pavankishore-AIDS/PCA-EXP-6-MATRIX-TRANSPOSITION-USING-SHARED-MEMORY-AY-23-24/assets/94154941/87deb296-3eba-4b85-99e8-6513520175b4)
 
 ## RESULT:
 
-Thus the program has been executed by using CUDA to mulptiply two matrices. It is observed that there are variations in host and device elapsed time. Device took 0.000211 sec and host took 0.000216 sec.
+The Matrix transposition on shared memory with grid (1,1) block (16,16) is demonstrated successfully.
